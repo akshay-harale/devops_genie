@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:~/data/chat
+    driverClassName: org.h2.Driver
+    username: sa
+    password: sa
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+      naming-strategy: org.hibernate.cfg.ImprovedNamingStrategy
+#enabling the H2 console
+  h2.console.enabled: true
+  flyway:
+    enabled: false
+  jwt:
+    secret: 36763979244226452948404D635166546A576D5A7134743777217A25432A462D
+    jwtExpirationInMs: 1800000
