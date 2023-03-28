@@ -1,5 +1,5 @@
 package com.encora.chat.model;
 
 public enum ConversationStatus {
-    IN_PROGRESS, COMPLETED
+    IN_PROGRESS, INITIATED, ONGOING, COMPLETED
 }
