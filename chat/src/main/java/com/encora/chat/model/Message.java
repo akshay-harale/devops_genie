@@ -1,5 +1,6 @@
 package com.encora.chat.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.*;
 
 import javax.persistence.Entity;
@@ -28,5 +29,6 @@ public class Message {
     private Status status;
     @ManyToOne(targetEntity = Conversation.class)
     @JoinColumn(name = "conversation_id", referencedColumnName = "id")
+    @JsonManagedReference
     private Conversation conversation;
 }

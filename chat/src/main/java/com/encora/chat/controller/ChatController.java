@@ -4,9 +4,11 @@ import com.encora.chat.model.AIRequest;
 import com.encora.chat.model.Conversation;
 import com.encora.chat.model.ConversationStatus;
 import com.encora.chat.model.Message;
+import com.encora.chat.model.MessagePayload;
 import com.encora.chat.model.TextCompletion;
 import com.encora.chat.repo.MessageRepo;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,6 +27,8 @@ import software.amazon.awssdk.services.ec2.model.Filter;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import java.util.List;
+
 @Controller
 @RequiredArgsConstructor
 public class ChatController {
@@ -37,65 +41,98 @@ public class ChatController {
     private final RestTemplate restTemplate;
     private final S3Client s3Client;
     private final Ec2Client ec2Client;
+    private final String terraformMessage = ". create terraform code only dont give any extra text.";
+    private final ConversationRepo conversationRepo;
 
     @MessageMapping("/message")
     @SendTo("/chatroom/public")
-    public Message receiveMessage(@Payload Message message) {
+    public MessagePayload receiveMessage(@Payload MessagePayload message) {
         return message;
     }
 
     @MessageMapping("/private-message")
-    public Message recMessage(@Payload Message message) {
-        message.setDate(java.time.LocalDateTime.now().toString());
-        if(message.getConversation() == null) {
-            // consider this as new conversation
+    public MessagePayload recMessage(@Payload MessagePayload messagePayload) {
+        Message message = MessagePayload.toMessage(messagePayload);
+        /*
+        create a new conversation by creating a new instance of the Conversation
+         class and setting the senderName property to the name of the sender.
+          Set the conversationStatus property to the initial status of the conversation. You can then persist the conversation object to the database using an ORM framework like Hibernate.
+         */
+        // check if conversation id is there in message
+        if (messagePayload.getConversationId() == null) {
+            // create a new conversation
             Conversation conversation = new Conversation();
-            conversation.setConversationStatus(ConversationStatus.IN_PROGRESS);
+            conversation.setSenderName(message.getSenderName());
+            conversation.setMessages(List.of(message));
+            conversation.setConversationStatus(ConversationStatus.INITIATED);
             message.setConversation(conversation);
-        }
-        if(message.getMessage().toLowerCase().contains("create") &&
-                message.getMessage().toLowerCase().contains("ec2") || message.getMessage().toLowerCase().contains("server")) {
-            if( message.getMessage().toLowerCase().contains("ubuntu")) {
-                DescribeImagesRequest ubuntuRequests = DescribeImagesRequest.builder().filters(Filter.builder()
-                        .name("ubuntu")
-                        .build()).build();
-                DescribeImagesResponse describeImagesResponse = ec2Client.describeImages(ubuntuRequests);
-                String awsImageId = describeImagesResponse.images().get(0).imageId();
-                message.setMessage(message.getMessage()+" with ami id "+awsImageId);
-                Conversation conversation = message.getConversation();
-                conversation.setConversationStatus(ConversationStatus.COMPLETED);
-                message.setConversation(conversation);
-                messageRepo.save(message);
-                String response = callOpenAI(message.getMessage());
-                uploadTOS3(message, response);
-                message.setServerMessage("Your request is in progress. Please wait for a while.");
-                simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private", message);
-                return message;
-            } else if ( !message.getMessage().toLowerCase().contains("type")) {
-                message.setServerMessage("add instance type in your request. e.g <'your request'> with instance type <'t2.micro'>");
-                simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private", message);
-                return message;
-            } else if ( !message.getMessage().toLowerCase().contains("security group")) {
-                message.setServerMessage("add security group in your request. e.g <'your request'> with security group <'sg-0b0b0b0b0b0b0b0b0'>");
-                simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private", message);
-                return message;
-            } else {
-                String response = callOpenAI(message.getMessage());
-                uploadTOS3(message, response);
-                message.setServerMessage("Your request is in progress. Please wait for a while.");
-                simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private", message);
-                return message;
-            }
+            conversationRepo.save(conversation);
+            handleMessage(message);
         } else {
-            message.setServerMessage("Sorry, I don't understand your request. please start new conversation");
+            handleMessage(message);
         }
-        simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private", message);
-        return message;
+        return MessagePayload.toMessagePayload(message);
     }
 
-    private void uploadTOS3(Message message, String response) {
+    private void handleMessage(Message message) {
+        Conversation conversation = message.getConversation();
+        List<Message> messages = conversation.getMessages();
+        if (messages.stream().anyMatch(m->m.getMessage().contains("create") && message.getMessage().contains("ec2"))) {
+            handleEC2Creation(conversation, message);
+        } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && message.getMessage().contains("rds"))) {
+
+        } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && message.getMessage().contains("s3"))) {
+
+        }
+    }
+
+    private void handleEC2Creation(Conversation conversation, Message lastMessage) {
+        // check what is the status of ec2 requirements
+        // check for type and security group in list of conversation messages
+        List<Message> messages = conversation.getMessages();
+        boolean containsRequiredToken = messages.stream().anyMatch(
+                message -> message.getMessage().contains("type") &&
+                        message.getMessage().contains("security group"));
+        if (containsRequiredToken) {
+            DescribeImagesRequest request = DescribeImagesRequest.builder()
+                    .filters( Filter.builder().name("name").values("ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*").build())
+                    .build();
+            DescribeImagesResponse response = ec2Client.describeImages(request);
+            logger.info("response: {}", response);
+            String imageName = response.images().get(0).name();
+            String finalMessage = String.join("", messages.stream().map(Message::getMessage).toList());
+
+            String gptResponse = callOpenAI(finalMessage +" with image name "+ imageName + terraformMessage);
+            uploadTOS3(conversation.getSenderName(), gptResponse);
+            lastMessage.setServerMessage("Your request is being processed");
+
+            MessagePayload responsePayload = MessagePayload.toMessagePayload(lastMessage);
+            responsePayload.setConversationId(conversation.getId());
+            simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
+                    responsePayload);
+            messageRepo.save(lastMessage);
+        } else {
+            if( !lastMessage.getMessage().contains("type") ) {
+                lastMessage.setServerMessage("Please send the type of ec2 instance you want to create in " +
+                        "format like type: t2.micro");
+                simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
+                        MessagePayload.toMessagePayload(lastMessage));
+                messageRepo.save(lastMessage);
+            }
+            if( !lastMessage.getMessage().contains("security group") ) {
+                lastMessage.setServerMessage("Please send the security group of ec2 instance you want to attach" +
+                        "in format like security group: sg-1234567890abcdef0");
+                simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
+                        MessagePayload.toMessagePayload(lastMessage));
+                messageRepo.save(lastMessage);
+            }
+        }
+
+    }
+
+    private void uploadTOS3(String senderName, String response) {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket("terraform-code-poc").key(message.getSenderName()+"/"+"fileName.tf").build();
+                .bucket("terraform-code-poc").key(senderName+"/"+"fileName.tf").build();
 
         s3Client.putObject(putObjectRequest, RequestBody.fromString(response));
     }
@@ -103,7 +140,7 @@ public class ChatController {
     // method to use rest template and call "https://api.openai.com/v1/chat/completions";
     public String callOpenAI(String message) {
         String url = "https://api.openai.com/v1/completions";
-        String apiKey = "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";
+        String apiKey = "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";
         String authorizationHeader = "Bearer " + apiKey;
 
         HttpHeaders headers = new HttpHeaders();
