@@ -12,7 +12,9 @@ const ChatRoom = () => {
         receivername: '',
         connected: false,
         message: '',
-        serverMessage: ''
+        serverMessage: '',
+        conversionId: null
+        
       });
       
     useEffect(() => {
@@ -20,6 +22,7 @@ const ChatRoom = () => {
     }, [userData]);
 
     const connect =()=>{
+        // GET MESSAGES AND SET IN PRIVATE CHATS IF AVAILABLE.
         let Sock = new SockJS('http://localhost:8080/ws');
         stompClient = over(Sock);
         stompClient.connect({},onConnected, onError);
@@ -62,6 +65,7 @@ const ChatRoom = () => {
         if(privateChats.get(payloadData.senderName)){
             privateChats.get(payloadData.senderName).push(payloadData);
             setPrivateChats(new Map(privateChats));
+            //setUserData({...userData,"conversationId": payload.conversationId});
         }else{
             let list =[];
             list.push(payloadData);
@@ -84,8 +88,9 @@ const ChatRoom = () => {
               var chatMessage = {
                 senderName: userData.username,
                 message: userData.message,
-                serverMessage: userData.serverMessage,
-                status:"MESSAGE"
+                serverMessage: privateChats.serverMessage,
+                status:"MESSAGE",
+                conversationId: privateChats.get(userData.username)[ privateChats.get(userData.username).length -1].conversationId
               };
               console.log(chatMessage);
               stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
@@ -99,8 +104,9 @@ const ChatRoom = () => {
             senderName: userData.username,
             receiverName:tab,
             message: userData.message,
-            serverMessage: userData.serverMessage,
-            status:"MESSAGE"
+            serverMessage: privateChats.serverMessage,
+            status:"MESSAGE",
+            conversationId:privateChats.get(userData.username).length!==0? privateChats.get(userData.username)[ privateChats.get(userData.username).length -1].conversationId :null
           };
           
           if(userData.username !== tab){
@@ -157,9 +163,9 @@ const ChatRoom = () => {
                     {[...privateChats.get(tab)].map((chat,index)=>(
                         <div key={index}>
                             <li className={`message ${chat.senderName === userData.username && "self"}`} key={index}>
-                                {chat.senderName !== userData.username && <div className="avatar">{chat.senderName}</div>}
-                                <div className="message-data">{chat.message}</div>
-                                {chat.senderName === userData.username && <div className="avatar self">{chat.senderName}</div>}
+                                {chat.message!=="" && chat.senderName !== userData.username && <div className="avatar">{chat.senderName}</div>}
+                                {chat.message!=="" ? <div className="message-data">{chat.message}</div>:''}
+                                {chat.message!=="" && chat.senderName === userData.username && <div className="avatar self">{chat.senderName}</div>}
                                 
                             </li>
                             <li className="message" key={index+"server"}>

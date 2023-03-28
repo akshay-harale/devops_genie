@@ -6,9 +6,9 @@ import com.encora.chat.model.ConversationStatus;
 import com.encora.chat.model.Message;
 import com.encora.chat.model.MessagePayload;
 import com.encora.chat.model.TextCompletion;
+import com.encora.chat.repo.ConversationRepo;
 import com.encora.chat.repo.MessageRepo;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -27,6 +27,7 @@ import software.amazon.awssdk.services.ec2.model.Filter;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import javax.transaction.Transactional;
 import java.util.List;
 
 @Controller
@@ -51,6 +52,7 @@ public class ChatController {
     }
 
     @MessageMapping("/private-message")
+    @Transactional
     public MessagePayload recMessage(@Payload MessagePayload messagePayload) {
         Message message = MessagePayload.toMessage(messagePayload);
         /*
@@ -65,10 +67,12 @@ public class ChatController {
             conversation.setSenderName(message.getSenderName());
             conversation.setMessages(List.of(message));
             conversation.setConversationStatus(ConversationStatus.INITIATED);
-            message.setConversation(conversation);
-            conversationRepo.save(conversation);
+            Conversation newConversation = conversationRepo.save(conversation);
+            message.setConversation(newConversation);
             handleMessage(message);
         } else {
+            Conversation conversation = conversationRepo.findById(messagePayload.getConversationId()).get();
+            message.setConversation(conversation);
             handleMessage(message);
         }
         return MessagePayload.toMessagePayload(message);
@@ -77,11 +81,11 @@ public class ChatController {
     private void handleMessage(Message message) {
         Conversation conversation = message.getConversation();
         List<Message> messages = conversation.getMessages();
-        if (messages.stream().anyMatch(m->m.getMessage().contains("create") && message.getMessage().contains("ec2"))) {
+        if (messages.stream().anyMatch(m->m.getMessage().contains("create") && m.getMessage().contains("ec2"))) {
             handleEC2Creation(conversation, message);
-        } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && message.getMessage().contains("rds"))) {
+        } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && m.getMessage().contains("rds"))) {
 
-        } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && message.getMessage().contains("s3"))) {
+        } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && m.getMessage().contains("s3"))) {
 
         }
     }
@@ -90,9 +94,10 @@ public class ChatController {
         // check what is the status of ec2 requirements
         // check for type and security group in list of conversation messages
         List<Message> messages = conversation.getMessages();
+        messages.add(lastMessage);
         boolean containsRequiredToken = messages.stream().anyMatch(
-                message -> message.getMessage().contains("type") &&
-                        message.getMessage().contains("security group"));
+                message -> message.getMessage().contains("type")) && messages.stream().anyMatch(
+                        message ->message.getMessage().contains("security group"));
         if (containsRequiredToken) {
             DescribeImagesRequest request = DescribeImagesRequest.builder()
                     .filters( Filter.builder().name("name").values("ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*").build())
@@ -118,6 +123,7 @@ public class ChatController {
                 simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
                         MessagePayload.toMessagePayload(lastMessage));
                 messageRepo.save(lastMessage);
+                return;
             }
             if( !lastMessage.getMessage().contains("security group") ) {
                 lastMessage.setServerMessage("Please send the security group of ec2 instance you want to attach" +
@@ -125,6 +131,7 @@ public class ChatController {
                 simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
                         MessagePayload.toMessagePayload(lastMessage));
                 messageRepo.save(lastMessage);
+                return;
             }
         }
 
@@ -140,7 +147,7 @@ public class ChatController {
     // method to use rest template and call "https://api.openai.com/v1/chat/completions";
     public String callOpenAI(String message) {
         String url = "https://api.openai.com/v1/completions";
-        String apiKey = "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";
+        String apiKey = "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";
         String authorizationHeader = "Bearer " + apiKey;
 
         HttpHeaders headers = new HttpHeaders();
