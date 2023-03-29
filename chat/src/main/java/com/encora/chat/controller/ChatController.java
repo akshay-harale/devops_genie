@@ -1,18 +1,13 @@
 package com.encora.chat.controller;
 
-import com.encora.chat.model.AIRequest;
 import com.encora.chat.model.Conversation;
 import com.encora.chat.model.ConversationStatus;
 import com.encora.chat.model.Message;
 import com.encora.chat.model.MessagePayload;
-import com.encora.chat.model.TextCompletion;
 import com.encora.chat.repo.ConversationRepo;
 import com.encora.chat.repo.MessageRepo;
+import com.encora.chat.service.OpenAIService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;
@@ -24,10 +19,17 @@ import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.DescribeImagesRequest;
 import software.amazon.awssdk.services.ec2.model.DescribeImagesResponse;
 import software.amazon.awssdk.services.ec2.model.Filter;
+import software.amazon.awssdk.services.ecs.EcsClient;
+import software.amazon.awssdk.services.ecs.model.RunTaskRequest;
+import software.amazon.awssdk.services.ecs.model.RunTaskResponse;
+import software.amazon.awssdk.services.ecs.model.StartTaskRequest;
+import software.amazon.awssdk.services.ecs.model.StartTaskResponse;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import javax.transaction.Transactional;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @Controller
@@ -39,11 +41,13 @@ public class ChatController {
 
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final MessageRepo messageRepo;
-    private final RestTemplate restTemplate;
+
     private final S3Client s3Client;
     private final Ec2Client ec2Client;
     private final String terraformMessage = ". create terraform code only dont give any extra text.";
     private final ConversationRepo conversationRepo;
+    private final OpenAIService openAIService;
+    private final EcsClient ecsClient;
 
     @MessageMapping("/message")
     @SendTo("/chatroom/public")
@@ -52,7 +56,7 @@ public class ChatController {
     }
 
     @MessageMapping("/private-message")
-    @Transactional
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     public MessagePayload recMessage(@Payload MessagePayload messagePayload) {
         Message message = MessagePayload.toMessage(messagePayload);
         /*
@@ -87,13 +91,28 @@ public class ChatController {
 
         } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && m.getMessage().contains("s3"))) {
 
+        } else {
+            handleSingleMessageConversation(message);
         }
+    }
+
+    private void handleSingleMessageConversation(Message message) {
+        String gptResponse = openAIService.callOpenAI(message.getMessage());
+        message.setServerMessage(gptResponse);
+        MessagePayload responsePayload = MessagePayload.toMessagePayload(message);
+        responsePayload.setConversationId(message.getConversation().getId());
+        responsePayload.setConversationStatus("COMPLETED");
+        simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private",
+                responsePayload);
+        message.getConversation().setConversationStatus(ConversationStatus.COMPLETED);
+        messageRepo.save(message);
     }
 
     private void handleEC2Creation(Conversation conversation, Message lastMessage) {
         // check what is the status of ec2 requirements
         // check for type and security group in list of conversation messages
-        List<Message> messages = conversation.getMessages();
+        List<Message> existingMessages = conversation.getMessages();
+        List<Message> messages = new ArrayList<>(existingMessages);
         messages.add(lastMessage);
         boolean containsRequiredToken = messages.stream().anyMatch(
                 message -> message.getMessage().contains("type")) && messages.stream().anyMatch(
@@ -107,15 +126,21 @@ public class ChatController {
             String imageName = response.images().get(0).name();
             String finalMessage = String.join("", messages.stream().map(Message::getMessage).toList());
 
-            String gptResponse = callOpenAI(finalMessage +" with image name "+ imageName + terraformMessage);
+            String gptResponse = openAIService.callOpenAI(finalMessage +" with image name "+ imageName + terraformMessage);
             uploadTOS3(conversation.getSenderName(), gptResponse);
             lastMessage.setServerMessage("Your request is being processed");
-
             MessagePayload responsePayload = MessagePayload.toMessagePayload(lastMessage);
             responsePayload.setConversationId(conversation.getId());
             simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
                     responsePayload);
+            conversation.setConversationStatus(ConversationStatus.COMPLETED);
+            conversationRepo.save(conversation);
             messageRepo.save(lastMessage);
+            // start new thread using executor service to call ecs task using ecs client
+            // and send the response back to the user
+            new Thread(() -> {
+                executeECSTask(lastMessage, gptResponse);
+            }).start();
         } else {
             if( !lastMessage.getMessage().contains("type") ) {
                 lastMessage.setServerMessage("Please send the type of ec2 instance you want to create in " +
@@ -137,38 +162,28 @@ public class ChatController {
 
     }
 
+    private void executeECSTask(Message lastMessage, String gptResponse) {
+        String ecsResponse="";
+        RunTaskRequest startTaskRequest = null;
+        if(lastMessage.getSenderName().equalsIgnoreCase("user1"))
+            startTaskRequest = RunTaskRequest.builder()
+                    .cluster("devops-genie")
+                    .taskDefinition("devops-genie-user-1")
+                    .build();
+        else if(lastMessage.getSenderName().equalsIgnoreCase("user2"))
+            startTaskRequest = RunTaskRequest.builder().cluster("devops-genie").taskDefinition("devops-genie-user-2").build();
+        if(startTaskRequest!= null) {
+            RunTaskResponse startTaskResponse = ecsClient.runTask(startTaskRequest);
+            ecsResponse = startTaskResponse.toString();
+        }
+
+        logger.info("ecs response: {}", ecsResponse);
+    }
+
     private void uploadTOS3(String senderName, String response) {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket("terraform-code-poc").key(senderName+"/"+"fileName.tf").build();
-
+                .bucket("terraform-code-poc").key(senderName+"/"+senderName+new Date()+".tf").build();
         s3Client.putObject(putObjectRequest, RequestBody.fromString(response));
     }
 
-    // method to use rest template and call "https://api.openai.com/v1/chat/completions";
-    public String callOpenAI(String message) {
-        String url = "https://api.openai.com/v1/completions";
-        String apiKey = "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";
-        String authorizationHeader = "Bearer " + apiKey;
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", authorizationHeader);
-
-        AIRequest aiRequest = new AIRequest();
-        aiRequest.setModel("text-davinci-003");
-        aiRequest.setMax_tokens(1000);
-        aiRequest.setTemperature(0.7);
-        aiRequest.setPrompt(message);
-        aiRequest.setTop_p(1.0);
-        aiRequest.setFrequency_penalty(0.0);
-        aiRequest.setPresence_penalty(0.0);
-        // pojo for above json
-
-        HttpEntity<AIRequest> entity = new HttpEntity<>(aiRequest, headers);
-        ResponseEntity<TextCompletion> response = restTemplate.postForEntity(url, entity, TextCompletion.class);
-        TextCompletion body = response.getBody();
-        logger.info("Response:{}", response);
-
-        return body.getChoices().get(0).getText();
-    }
 }

@@ -29,6 +29,7 @@ public class MessagePayload {
     private String date;
     private Status status;
     private Long conversationId;
+    private String conversationStatus;
 
     public static MessagePayload toMessagePayload(Message message) {
         return MessagePayload.builder()
@@ -39,6 +40,7 @@ public class MessagePayload {
                 .serverMessage(message.getServerMessage())
                 .date(message.getDate())
                 .status(message.getStatus())
+                .conversationStatus(message.getConversation().getConversationStatus())
                 .conversationId(message.getConversation().getId())
                 .build();
     }
