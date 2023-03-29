@@ -150,7 +150,9 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
                         messages.stream().anyMatch(msg -> msg.getMessage().contains("password"));
         if (containsRequiredToken) {
             String userRequest = String.join("", messages.stream().map(Message::getMessage).toList());
-            String gptResponse = openAIService.callOpenAI(userRequest + ""  + terraformMessage);
+            String gptResponse = openAIService.callOpenAI(userRequest + "" +
+                    "with skip_final_snapshot = true " +
+                    "with apply_immediately = true."  + terraformMessage);
             s3Service.uploadTOS3(conversation.getSenderName(), gptResponse);
             message.setServerMessage("Your request is being processed");
             MessagePayload responsePayload = MessagePayload.toMessagePayload(message);
