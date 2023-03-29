@@ -106,7 +106,9 @@ const ChatRoom = () => {
             message: userData.message,
             serverMessage: privateChats.serverMessage,
             status:"MESSAGE",
-            conversationId:privateChats.get(userData.username).length!==0? privateChats.get(userData.username)[ privateChats.get(userData.username).length -1].conversationId :null
+            conversationId:privateChats.get(userData.username).length!==0  ? (
+                privateChats.get(userData.username)[ privateChats.get(userData.username).length -1].conversationStatus !== "COMPLETED"?
+            privateChats.get(userData.username)[ privateChats.get(userData.username).length -1].conversationId:null ) :null
           };
           
           if(userData.username !== tab){
