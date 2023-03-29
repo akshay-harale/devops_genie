@@ -4,6 +4,7 @@ import com.encora.chat.model.AIRequest;
 import com.encora.chat.model.TextCompletion;
 import com.encora.chat.service.OpenAIService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -18,12 +19,14 @@ public class OpenAIServiceImpl implements OpenAIService {
     // create logger for this class
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(OpenAIServiceImpl.class);
 
+    @Value("${openai.key}")
+    private String openAIKey;
+
     private final RestTemplate restTemplate;
     @Override
     public String callOpenAI(String message) {
         String url = "https://api.openai.com/v1/completions";
-        String apiKey = "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";
-        String authorizationHeader = "Bearer " + apiKey;
+        String authorizationHeader = "Bearer " + openAIKey;
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

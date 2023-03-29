@@ -25,6 +25,7 @@ public class Message {
     private int id;
     private String senderName;
     private String receiverName;
+    @Column(length = 10000)
     private String message;
     @Column(length = 10000)
     private String serverMessage;

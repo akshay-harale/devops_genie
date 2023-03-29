@@ -19,3 +19,5 @@ spring:
 aws.region: us-west-1
 cloud.aws.region.static: us-west-2
 cloud.aws.stack.auto: false
+
+openai.key: ${OPENAI_KEY}
