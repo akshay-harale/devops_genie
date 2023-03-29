@@ -21,7 +21,7 @@ const ChatRoom = () => {
       
     useEffect(() => {
 
-        fetch(`/messages/${tab}`)
+        fetch(config.backendHost+`/messages/${tab}`)
             .then((response) => response.json())
             .then((data) => {
 
@@ -32,7 +32,7 @@ const ChatRoom = () => {
     }, [tab]);
 
     const connect = () => {
-        let Sock = new SockJS('/ws');
+        let Sock = new SockJS(config.backendHost+'/ws');
         stompClient = over(Sock);
         stompClient.connect({}, onConnected, onError);
     }
