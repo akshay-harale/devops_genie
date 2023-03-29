@@ -11,4 +11,6 @@ public interface AWSServiceHandler {
     void handleECSCreation(Conversation conversation, Message message);
 
     void handleRDSCreation(Conversation conversation, Message message);
+
+    void showInfrastructure(Message message);
 }

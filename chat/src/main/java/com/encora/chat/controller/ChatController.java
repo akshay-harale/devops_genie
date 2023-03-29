@@ -76,7 +76,10 @@ public class ChatController {
             awsServiceHandler.handleS3Creation(conversation, message);
         } else if(messages.stream().anyMatch(m->m.getMessage().contains("create") && m.getMessage().contains("ecs"))) {
             awsServiceHandler.handleECSCreation(conversation, message);
-        } else {
+        } else if (messages.stream().anyMatch(m->m.getMessage().contains("infrastructure"))) {
+            awsServiceHandler.showInfrastructure(message);
+        }
+        else {
             handleSingleMessageConversation(message);
         }
     }

@@ -205,4 +205,14 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
         }
     }
 
+    @Override
+    public void showInfrastructure(Message message) {
+        //https://terraform-code-poc.s3.us-west-2.amazonaws.com/user1/graph.svg
+        String s3Url = "https://terraform-code-poc.s3.us-west-2.amazonaws.com/" + message.getSenderName() + "/graph.svg";
+        message.setServerMessage("Go to this url to see infrastructure : "+s3Url);
+        simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private",
+                MessagePayload.toMessagePayload(message));
+        messageRepo.save(message);
+    }
+
 }
