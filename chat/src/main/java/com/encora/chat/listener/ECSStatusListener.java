@@ -22,6 +22,7 @@ public class ECSStatusListener {
     private final ObjectMapper objectMapper;
     @SqsListener(value = "Devops_genie", deletionPolicy = SqsMessageDeletionPolicy.ALWAYS)
     public void listen(String message) {
+        logger.info("Message received: {}", message);
         TFStatusMessage tfStatusMessage = null;
         try {
             tfStatusMessage = objectMapper.readValue(message, TFStatusMessage.class);
