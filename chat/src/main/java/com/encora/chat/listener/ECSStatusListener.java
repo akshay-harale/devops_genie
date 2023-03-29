@@ -29,7 +29,7 @@ public class ECSStatusListener {
 
             MessagePayload payload = MessagePayload.builder()
                     .senderName(tfStatusMessage.getUser())
-                    .message(tfStatusMessage.getMessage()).build();
+                    .serverMessage(tfStatusMessage.getMessage()).build();
             simpMessagingTemplate.convertAndSendToUser(tfStatusMessage.getUser(), "/private", payload);
             logger.info("Message received: {}", payload);
         } catch (JsonProcessingException e) {

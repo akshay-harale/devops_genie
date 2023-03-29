@@ -22,7 +22,7 @@ public class OpenAIServiceImpl implements OpenAIService {
     @Override
     public String callOpenAI(String message) {
         String url = "https://api.openai.com/v1/completions";
-        String apiKey = "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";
+        String apiKey = "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";
         String authorizationHeader = "Bearer " + apiKey;
 
         HttpHeaders headers = new HttpHeaders();
