@@ -29,7 +29,8 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
 
     private final S3Service s3Service;
     private final Ec2Client ec2Client;
-    private final String terraformMessage = " create terraform code only, dont give any extra text. Also give sensible names to resources";
+    private final String terraformMessage = " create terraform code only, dont give any extra text. Also give sensible names to resources." +
+            "dont use provider block in terraform code.";
     private final ConversationRepo conversationRepo;
     private final OpenAIService openAIService;
     // declare simpMessagingTemplate
