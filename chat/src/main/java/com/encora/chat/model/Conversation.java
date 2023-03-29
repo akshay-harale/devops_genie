@@ -23,7 +23,7 @@ public class Conversation {
     @Id
     @GeneratedValue(strategy = javax.persistence.GenerationType.IDENTITY)
     private long id;
-    private ConversationStatus conversationStatus;
+    private String conversationStatus;
     private String senderName;
     @OneToMany(targetEntity = Message.class, mappedBy = "conversation")
     @JsonBackReference

@@ -3,11 +3,13 @@ package com.encora.chat.model;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.*;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.validation.constraints.Size;
 
 @NoArgsConstructor
 @AllArgsConstructor
@@ -24,6 +26,7 @@ public class Message {
     private String senderName;
     private String receiverName;
     private String message;
+    @Column(length = 10000)
     private String serverMessage;
     private String date;
     private Status status;
