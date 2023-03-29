@@ -22,7 +22,7 @@ public class S3ServiceImpl implements S3Service {
     public void uploadTOS3(String senderName, String response) {
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket("terraform-code-poc").key(senderName+"/"+senderName+"_"+getDate()+".tf").build();
+                .bucket("terraform-code-poc").key(senderName+"/"+senderName+".tf").build();
         s3Client.putObject(putObjectRequest, RequestBody.fromString(response));
     }
     private String getDate() {

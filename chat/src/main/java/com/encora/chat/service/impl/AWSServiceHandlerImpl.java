@@ -29,7 +29,7 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
 
     private final S3Service s3Service;
     private final Ec2Client ec2Client;
-    private final String terraformMessage = ". create terraform code only dont give any extra text.";
+    private final String terraformMessage = ". create terraform code only dont give any extra text. Also give sensible names to resources";
     private final ConversationRepo conversationRepo;
     private final OpenAIService openAIService;
     // declare simpMessagingTemplate
@@ -45,9 +45,9 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
         List<Message> existingMessages = conversation.getMessages();
         List<Message> messages = new ArrayList<>(existingMessages);
         messages.add(lastMessage);
-        boolean containsRequiredToken = messages.stream().anyMatch(
-                message -> message.getMessage().contains("type")) && messages.stream().anyMatch(
-                message ->message.getMessage().contains("security group"));
+        boolean containsRequiredToken =
+                messages.stream().anyMatch(message -> message.getMessage().contains("type")) &&
+                messages.stream().anyMatch(message ->message.getMessage().contains("security group"));
         if (containsRequiredToken) {
             DescribeImagesRequest request = DescribeImagesRequest.builder()
                     .filters( Filter.builder().name("name").values("ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*").build())
@@ -64,7 +64,7 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
             simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
                     responsePayload);
             conversation.setConversationStatus(ConversationStatus.COMPLETED);
-            conversationRepo.save(conversation);
+            lastMessage.setConversation(conversation);
             messageRepo.save(lastMessage);
             // start new thread using executor service to call ecs task using ecs client
             // and send the response back to the user
