@@ -1,6 +1,9 @@
 package com.encora.chat.listener;
 
+import com.encora.chat.model.Conversation;
+import com.encora.chat.model.Message;
 import com.encora.chat.model.MessagePayload;
+import com.encora.chat.repo.MessageRepo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,8 @@ import org.springframework.cloud.aws.messaging.listener.annotation.SqsListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
+
 @Service
 @RequiredArgsConstructor
 public class ECSStatusListener {
@@ -20,7 +25,11 @@ public class ECSStatusListener {
 
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final ObjectMapper objectMapper;
+    private final MessageRepo messageRepo;
+
+
     @SqsListener(value = "Devops_genie", deletionPolicy = SqsMessageDeletionPolicy.ALWAYS)
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     public void listen(String message) {
         logger.info("Message received: {}", message);
         TFStatusMessage tfStatusMessage = null;
@@ -31,6 +40,12 @@ public class ECSStatusListener {
                     .senderName(tfStatusMessage.getUser())
                     .serverMessage(tfStatusMessage.getMessage()).build();
             simpMessagingTemplate.convertAndSendToUser(tfStatusMessage.getUser(), "/private", payload);
+            // message payload to message
+            Conversation conversation = new Conversation();
+            conversation.setConversationStatus("COMPLETED");
+            Message toPersist = MessagePayload.toMessage(payload);
+            toPersist.setConversation(conversation);
+            messageRepo.save(toPersist);
             logger.info("Message received: {}", payload);
         } catch (JsonProcessingException e) {
             logger.error("Error while parsing message: {}", message, e);

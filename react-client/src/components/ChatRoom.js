@@ -3,6 +3,7 @@ import { over } from 'stompjs';
 import SockJS from 'sockjs-client';
 import "./ChatRoom.css"
 import config from "../config/config"
+import axios from "axios"
 
 var stompClient = null;
 const ChatRoom = () => {
@@ -20,13 +21,10 @@ const ChatRoom = () => {
       });
       
     useEffect(() => {
-
-        fetch(config.backendHost+`/messages/${tab}`)
-            .then((response) => response.json())
-            .then((data) => {
-
+        axios.get(config.backendHost + `/messages/${tab}`)
+            .then((response) => {
                 setPrivateChats(new Map([
-                    [userData.username, data]]))
+                    [userData.username, response.data]]))
             });
 
     }, [tab]);
