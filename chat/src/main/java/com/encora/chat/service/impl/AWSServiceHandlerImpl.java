@@ -49,14 +49,8 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
         boolean containsRequiredToken =
                 messages.stream().anyMatch(message -> message.getMessage().contains("type")) ;
         if (containsRequiredToken) {
-            DescribeImagesRequest request = DescribeImagesRequest.builder()
-                    .filters( Filter.builder().name("name").values("ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*").build())
-                    .build();
-            DescribeImagesResponse response = ec2Client.describeImages(request);
-            logger.info("Describe image response {}", response.images().stream().map(image -> image.imageId()).toList());
-            String imageName = response.images().get(0).imageId();
             String userRequest = String.join("", messages.stream().map(Message::getMessage).toList())
-                    +" with image name "+ imageName;
+                    +" with image id "+ "ami-0fcf52bcf5db7b003";
             String gptResponse = openAIService.callOpenAI(userRequest + ""  + terraformMessage);
             s3Service.uploadTOS3(conversation.getSenderName(), gptResponse);
             lastMessage.setServerMessage("Your request is being processed");

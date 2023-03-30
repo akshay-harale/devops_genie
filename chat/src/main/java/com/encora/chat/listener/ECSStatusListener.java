@@ -3,6 +3,7 @@ package com.encora.chat.listener;
 import com.encora.chat.model.Conversation;
 import com.encora.chat.model.Message;
 import com.encora.chat.model.MessagePayload;
+import com.encora.chat.repo.ConversationRepo;
 import com.encora.chat.repo.MessageRepo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +27,7 @@ public class ECSStatusListener {
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final ObjectMapper objectMapper;
     private final MessageRepo messageRepo;
+    private final ConversationRepo conversationRepo;
 
 
     @SqsListener(value = "Devops_genie", deletionPolicy = SqsMessageDeletionPolicy.ALWAYS)
@@ -43,8 +45,9 @@ public class ECSStatusListener {
             // message payload to message
             Conversation conversation = new Conversation();
             conversation.setConversationStatus("COMPLETED");
+
             Message toPersist = MessagePayload.toMessage(payload);
-            toPersist.setConversation(conversation);
+            toPersist.setConversation(conversationRepo.save(conversation));
             messageRepo.save(toPersist);
             logger.info("Message received: {}", payload);
         } catch (JsonProcessingException e) {
