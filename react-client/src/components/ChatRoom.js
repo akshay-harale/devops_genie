@@ -167,7 +167,7 @@ const ChatRoom = () => {
                                     {chat.senderName !== userData.username && <div className="avatar">{chat.senderName}</div>}
                                     <div className="message-data">{chat.message}</div>
                                     {chat.senderName === userData.username && <div className="avatar self">{chat.senderName}</div>}
-                                    <div className="avatar">Server</div>
+                                    <div className="avatar">Genie</div>
                                     <div className="message-data">{chat.serverMessage}</div>
                                 </li>
                             ))}
@@ -189,7 +189,7 @@ const ChatRoom = () => {
                                 
                             </li>
                             <li className="message" key={index+"server"}>
-                                <div className="avatar">Server</div>
+                                <div className="avatar">Genie</div>
                                 <div className="message-data">{chat.serverMessage}</div>
                             </li>
                         </div>

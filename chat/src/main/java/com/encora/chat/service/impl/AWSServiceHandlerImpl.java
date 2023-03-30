@@ -61,8 +61,13 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
             conversation.setConversationStatus(ConversationStatus.COMPLETED);
             lastMessage.setConversation(conversation);
             messageRepo.save(lastMessage);
-            // start new thread using executor service to call ecs task using ecs client
-            // and send the response back to the user
+
+            String funFactEc2 = "give me fun fact about ec2";
+            String funFactResponse = openAIService.callOpenAI(funFactEc2);
+            responsePayload.setServerMessage(funFactResponse);
+            responsePayload.setMessage("");
+            simpMessagingTemplate.convertAndSendToUser(lastMessage.getSenderName(), "/private",
+                    responsePayload);
             new Thread(() -> {
                 ecsTaskExecutor.executeECSTask(lastMessage, gptResponse);
             }).start();
@@ -99,8 +104,14 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
             conversation.setConversationStatus(ConversationStatus.COMPLETED);
             message.setConversation(conversation);
             messageRepo.save(message);
-            // start new thread using executor service to call ecs task using ecs client
-            // and send the response back to the user
+
+            String funFactEc2 = "give me fun fact about S3";
+            String funFactResponse = openAIService.callOpenAI(funFactEc2);
+            responsePayload.setServerMessage(funFactResponse);
+            responsePayload.setMessage("");
+            simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private",
+                    responsePayload);
+
             new Thread(() -> {
                 ecsTaskExecutor.executeECSTask(message, gptResponse);
             }).start();
@@ -156,8 +167,14 @@ public class AWSServiceHandlerImpl implements AWSServiceHandler {
             conversation.setConversationStatus(ConversationStatus.COMPLETED);
             message.setConversation(conversation);
             messageRepo.save(message);
-            // start new thread using executor service to call ecs task using ecs client
-            // and send the response back to the user
+
+            String funFactEc2 = "give me fun fact about rds";
+            String funFactResponse = openAIService.callOpenAI(funFactEc2);
+            responsePayload.setServerMessage(funFactResponse);
+            responsePayload.setMessage("");
+            simpMessagingTemplate.convertAndSendToUser(message.getSenderName(), "/private",
+                    responsePayload);
+
             new Thread(() -> {
                 ecsTaskExecutor.executeECSTask(message, gptResponse);
             }).start();

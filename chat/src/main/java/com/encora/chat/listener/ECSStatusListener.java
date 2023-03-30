@@ -40,6 +40,7 @@ public class ECSStatusListener {
 
             MessagePayload payload = MessagePayload.builder()
                     .senderName(tfStatusMessage.getUser())
+                    .message("")
                     .serverMessage(tfStatusMessage.getMessage()).build();
             simpMessagingTemplate.convertAndSendToUser(tfStatusMessage.getUser(), "/private", payload);
             // message payload to message
