@@ -47,7 +47,8 @@ public class ECSStatusListener {
             conversation.setConversationStatus("COMPLETED");
 
             Message toPersist = MessagePayload.toMessage(payload);
-            toPersist.setConversation(conversationRepo.save(conversation));
+            Conversation newConversation = conversationRepo.save(conversation);
+            toPersist.setConversation(newConversation);
             messageRepo.save(toPersist);
             logger.info("Message received: {}", payload);
         } catch (JsonProcessingException e) {
