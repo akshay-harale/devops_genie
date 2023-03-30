@@ -50,7 +50,7 @@ public class MessagePayload {
                 .id(message.getId())
                 .senderName(message.getSenderName())
                 .receiverName(message.getReceiverName())
-                .message(message.getMessage())
+                .message(message.getMessage().toLowerCase())
                 .serverMessage(message.getServerMessage())
                 .date(message.getDate())
                 .status(message.getStatus())
